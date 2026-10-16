@@ -20,6 +20,7 @@ UpkeepTrack takes the opposite route: **one HTML file you double-click**. Your d
 | 🛡️ **Warranty tracking** | purchase date + warranty length → automatic status (`Active` / `Expiring` / `Expired`), progress bar, days-left countdown |
 | 🧰 **Recurring maintenance** | tasks with custom intervals (e.g. "wash AC filter every 90 days"); next due date is computed from the last time you did it |
 | ✅ **One-click "Mark done"** | logs the date automatically and schedules the next occurrence |
+| 🔔 **Browser notifications** | optional reminders when a task comes due or a warranty expires — lead time configurable (same day / 1 / 3 / 7 days) |
 | 📊 **Dashboard** | stats, a "needs attention" list (expiring warranties + overdue tasks) and a 30-day timeline |
 | 🔍 **Search & filters** | full-text search, category chips, warranty-status filter |
 | 🌐 **Bilingual** | English and 中文, switchable in one click |
@@ -65,10 +66,13 @@ That's it. No `npm install`, no build, no server required.
 
 > 💡 Tip: after you finish a task, hit **Mark done** — UpkeepTrack automatically moves the task to its next due date.
 
+> 🔔 Reminders: browser notifications need a secure context. Open the app via `http://localhost` (e.g. `python -m http.server`) or https, keep the tab open, and enable them in **Settings → Reminders**. On `file://` they are unavailable and the app tells you why.
+
 ## 🔐 Privacy
 
 - All data lives in your browser's `localStorage` on **your** device.
 - The app makes **zero network requests** — it works fully offline.
+- Browser notifications (if enabled) are generated locally by your browser and never leave your device.
 - No analytics, no cookies, no accounts, no servers.
 
 ## 🛠 Tech

@@ -435,6 +435,43 @@ footer a{color:var(--muted);font-weight:600}
   </div>
 
   <div class="panel">
+    <h3><span id="set-reminders">Reminders</span></h3>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-notif">Browser notifications</h4>
+        <p id="set-notif-desc">Get a notification when a task is due or a warranty is about to expire.</p>
+      </div>
+      <label class="switch"><input type="checkbox" id="notifToggle"><span></span></label>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-lead">Remind me</h4>
+        <p id="set-lead-desc">How many days before the due date.</p>
+      </div>
+      <select class="filter" id="leadSelect" style="min-width:130px">
+        <option value="0">On the due day</option>
+        <option value="1">1 day before</option>
+        <option value="3">3 days before</option>
+        <option value="7">7 days before</option>
+      </select>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-perm">Notification status</h4>
+        <p id="permStatus" style="max-width:420px"></p>
+      </div>
+      <button class="btn ghost sm" id="permBtn">Enable notifications</button>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-test">Test notification</h4>
+        <p id="set-test-desc">Send a sample notification to confirm everything works.</p>
+      </div>
+      <button class="btn ghost sm" id="testBtn">Send test</button>
+    </div>
+  </div>
+
+  <div class="panel">
     <h3><span id="set-data">Data</span></h3>
     <div class="set-row">
       <div class="grow">
@@ -518,6 +555,15 @@ const I18N = {
     taskDone:"Task marked as done", itemSaved:"Item saved", dataImported:"Data imported", dataExported:"Data exported",
     demoLoaded:"Demo data loaded", allCleared:"All data erased", invalidFile:"Invalid backup file",
     nameRequired:"Please enter a name.", taskNameReq:"Please enter a task name and a valid interval.",
+    setReminders:"Reminders", setNotif:"Browser notifications", setNotifDesc:"Get a notification when a maintenance task is due or a warranty is about to expire.",
+    setLead:"Remind me", setLeadDesc:"How many days before the due date.",
+    lead0:"On the due day", lead1:"1 day before", lead3:"3 days before", lead7:"7 days before",
+    setPerm:"Notification status", permBtn:"Enable notifications",
+    setTest:"Test notification", setTestDesc:"Send a sample notification to confirm everything works.", testBtn:"Send test",
+    permUnsupported:"Not supported by this browser.", permGranted:"Enabled — you will be notified.", permDefault:"Awaiting permission.", permDenied:"Blocked in browser settings.",
+    permInsecure:"Browser notifications need http://localhost or https — open the app via a local server (file:// blocks them).",
+    notifEnabled:"Notifications enabled", notifDisabled:"Notifications disabled", testSent:"Test notification sent", notifUnavailable:"Notifications unavailable here — open the app via http://localhost.",
+    ntfTask:"Maintenance due", ntfWarranty:"Warranty", ntfExpires:"Expires", ntfDue:"Due", ntfOverdue:"overdue",
     nextUp:"Next task", noTasks:"No maintenance tasks yet.",
     setGeneral:"General", setTheme:"Dark theme", setThemeDesc:"Easier on the eyes at night. Stored on this device.",
     setLang:"Language", setLangDesc:"Interface language.",
@@ -560,6 +606,15 @@ const I18N = {
     taskDone:"任务已标记完成", itemSaved:"已保存物品", dataImported:"已导入数据", dataExported:"已导出数据",
     demoLoaded:"已载入示例数据", allCleared:"已清除全部数据", invalidFile:"备份文件无效",
     nameRequired:"请输入名称。", taskNameReq:"请输入任务名称和有效的间隔天数。",
+    setReminders:"提醒", setNotif:"浏览器通知", setNotifDesc:"保养任务到期或保修即将过期时，通过浏览器通知提醒你。",
+    setLead:"提前提醒", setLeadDesc:"在到期日前多少天提醒。",
+    lead0:"到期当天", lead1:"提前 1 天", lead3:"提前 3 天", lead7:"提前 7 天",
+    setPerm:"通知状态", permBtn:"开启通知",
+    setTest:"测试通知", setTestDesc:"发送一条示例通知，确认一切正常。", testBtn:"发送测试",
+    permUnsupported:"当前浏览器不支持通知。", permGranted:"已开启——到期时会收到提醒。", permDefault:"等待授权。", permDenied:"已在浏览器设置中被阻止。",
+    permInsecure:"浏览器通知需要 http://localhost 或 https——请通过本地服务器打开应用（file:// 下不可用）。",
+    notifEnabled:"已开启通知", notifDisabled:"已关闭通知", testSent:"测试通知已发送", notifUnavailable:"当前环境无法发送通知——请通过 http://localhost 打开应用。",
+    ntfTask:"保养任务到期", ntfWarranty:"保修", ntfExpires:"到期", ntfDue:"到期", ntfOverdue:"已逾期",
     nextUp:"下一任务", noTasks:"还没有保养任务。",
     setGeneral:"通用", setTheme:"深色主题", setThemeDesc:"夜间更护眼，仅保存在本设备。",
     setLang:"语言", setLangDesc:"界面语言。",
@@ -597,7 +652,7 @@ const OVERDUE = "overdue", DUE = "due", SOON = "soon", LATER = "later", UNSCHEDU
 
 /* ---------- 3. State & persistence ---------- */
 const LS_KEY = "upkeeptrack.v1";
-let state = { items: [], theme: "light", lang: "en" };
+let state = { items: [], theme: "light", lang: "en", notify: { enabled:false, lead:1 }, notified: {} };
 
 function save(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
@@ -611,6 +666,11 @@ function load(){
     state.items.forEach(it => { if(!it.id) it.id = uid(); }); // normalize legacy backups
     state.theme = data.theme === "dark" ? "dark" : "light";
     state.lang = data.lang === "zh" ? "zh" : "en";
+    state.notify = {
+      enabled: !!(data.notify && data.notify.enabled),
+      lead: (data.notify && Number.isFinite(Number(data.notify.lead))) ? Number(data.notify.lead) : 1
+    };
+    state.notified = (data.notified && typeof data.notified === "object") ? data.notified : {};
   }catch(e){ /* corrupted storage → start fresh */ }
 }
 
@@ -721,7 +781,10 @@ function applyStatic(){
     "set-data":"setData", "set-export":"setExport", "set-export-desc":"setExportDesc",
     "set-import":"setImport", "set-import-desc":"setImportDesc",
     "set-demo":"setDemo", "set-demo-desc":"setDemoDesc",
-    "set-clear":"setClear", "set-clear-desc":"setClearDesc", "set-about":"setAbout"
+    "set-clear":"setClear", "set-clear-desc":"setClearDesc", "set-about":"setAbout",
+    "set-reminders":"setReminders", "set-notif":"setNotif", "set-notif-desc":"setNotifDesc",
+    "set-lead":"setLead", "set-lead-desc":"setLeadDesc", "set-perm":"setPerm",
+    "set-test":"setTest", "set-test-desc":"setTestDesc"
   };
   for(const id in map){ const n = document.getElementById(id); if(n) n.textContent = t(map[id]); }
   $("#searchInput").placeholder = t("searchPlaceholder");
@@ -734,6 +797,14 @@ function applyStatic(){
      <option value="expired">${t("stExpired")}</option>
      <option value="none">${t("stNone")}</option>`;
   $("#statusFilter").value = statusFilter;
+  $("#leadSelect").innerHTML =
+    `<option value="0">${t("lead0")}</option>
+     <option value="1">${t("lead1")}</option>
+     <option value="3">${t("lead3")}</option>
+     <option value="7">${t("lead7")}</option>`;
+  $("#leadSelect").value = state.notify.lead;
+  $("#notifToggle").checked = state.notify.enabled;
+  renderPermStatus();
 }
 
 function render(){
@@ -936,7 +1007,7 @@ function renderMaintenance(){
 
 /* --- Settings --- */
 function renderSettings(){
-  $("#about-text").textContent = `UpkeepTrack v1.0 — ${t("tagline")}. Built with vanilla JavaScript, zero dependencies. MIT license.`;
+  $("#about-text").textContent = `UpkeepTrack v1.1 — ${t("tagline")}. Built with vanilla JavaScript, zero dependencies. MIT license.`;
 }
 
 /* ---------- 7. Modals ---------- */
@@ -1119,6 +1190,79 @@ function toast(msg){
   setTimeout(() => { n.style.opacity = "0"; n.style.transition = "opacity .3s"; setTimeout(() => n.remove(), 300); }, 2200);
 }
 
+/* ---------- 8b. Browser notifications engine ---------- */
+const notifySupported = () => ("Notification" in window);
+
+// Fire one system notification; returns false when the environment cannot show it.
+function fireNotification(title, body){
+  try{
+    if(!notifySupported() || Notification.permission !== "granted" || !window.isSecureContext) return false;
+    const n = new Notification(title, { body, tag: "upkeeptrack" });
+    n.onclick = () => { window.focus(); n.close(); };
+    return true;
+  }catch(e){ return false; }
+}
+
+// Called on start and every minute: notify once per due event (task/warranty) per occurrence.
+function checkReminders(){
+  if(!state.notify.enabled || !notifySupported() || Notification.permission !== "granted" || !window.isSecureContext) return;
+  const today = todayISO();
+  const horizon = addDaysTo(today, state.notify.lead ?? 1);
+  let fired = 0;
+  state.items.forEach(it => {
+    const end = warrantyEnd(it);
+    if(end && end <= horizon){
+      const key = "w:" + it.id + ":" + end;
+      if(!state.notified[key]){
+        const st = warrantyStatus(it);
+        const rel = st === EXPIRED ? t("ntfOverdue") : fmtRel(end);
+        const title = t("ntfWarranty") + " " + t(st === EXPIRED ? "warrantyExpired" : "warrantyExpiring") + ": " + it.name;
+        if(fireNotification(title, t("ntfExpires") + " " + fmtDate(end) + " (" + rel + ")")){
+          state.notified[key] = today; fired++;
+        }
+      }
+    }
+    allTasks(it).forEach(tk => {
+      const due = nextDue(tk);
+      if(due && due <= horizon){
+        const key = "t:" + it.id + ":" + tk.id + ":" + due;
+        if(!state.notified[key]){
+          const st = taskStatus(tk);
+          const rel = st === OVERDUE ? t("ntfOverdue") : fmtRel(due);
+          const title = t("ntfTask") + ": " + tk.name;
+          if(fireNotification(title, it.name + " — " + t("ntfDue") + " " + fmtDate(due) + " (" + rel + ")")){
+            state.notified[key] = today; fired++;
+          }
+        }
+      }
+    });
+  });
+  if(fired > 0){
+    // Drop keys older than a week to keep storage small.
+    const cutoff = addDaysTo(today, -7);
+    Object.keys(state.notified).forEach(k => { if(state.notified[k] < cutoff) delete state.notified[k]; });
+    save();
+  }
+}
+
+// Reflect the current notification permission state in the Settings panel.
+function renderPermStatus(){
+  const status = $("#permStatus"), btn = $("#permBtn");
+  if(!notifySupported()){ status.textContent = t("permUnsupported"); btn.style.display = "none"; return; }
+  btn.style.display = "";
+  const p = Notification.permission;
+  if(p === "granted"){
+    status.textContent = window.isSecureContext ? t("permGranted") : t("permInsecure");
+    btn.textContent = t("testBtn");
+  }else if(p === "denied"){
+    status.textContent = t("permDenied") + " " + t("permInsecure");
+    btn.textContent = t("permBtn");
+  }else{
+    status.textContent = t("permDefault");
+    btn.textContent = t("permBtn");
+  }
+}
+
 /* ---------- 9. Global events ---------- */
 function switchView(name){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.view === name));
@@ -1171,6 +1315,60 @@ function setLang(l){
 }
 
 // Settings actions.
+$("#notifToggle").addEventListener("change", async e => {
+  const want = e.target.checked;
+  if(!want){
+    state.notify.enabled = false; save(); render();
+    toast(t("notifDisabled")); return;
+  }
+  if(!notifySupported()){
+    e.target.checked = false; state.notify.enabled = false; save(); render();
+    toast(t("notifUnavailable")); return;
+  }
+  if(Notification.permission === "default"){
+    const p = await Notification.requestPermission();
+    if(p !== "granted"){
+      e.target.checked = false; state.notify.enabled = false; save(); render(); renderPermStatus();
+      toast(Notification.permission === "denied" ? t("permDenied") : t("permInsecure"));
+      return;
+    }
+  }
+  if(Notification.permission !== "granted" || !window.isSecureContext){
+    e.target.checked = false; state.notify.enabled = false; save(); render(); renderPermStatus();
+    toast(t("permInsecure")); return;
+  }
+  state.notify.enabled = true; save(); render();
+  toast(t("notifEnabled")); checkReminders();
+});
+$("#leadSelect").addEventListener("change", e => {
+  state.notify.lead = Number(e.target.value);
+  save();
+});
+$("#permBtn").addEventListener("click", async () => {
+  if(!notifySupported()) return;
+  if(Notification.permission === "granted"){
+    if(fireNotification("UpkeepTrack", t("testSent"))) toast(t("testSent"));
+    else toast(t("notifUnavailable"));
+    return;
+  }
+  if(Notification.permission === "default"){
+    const p = await Notification.requestPermission();
+    if(p === "granted"){
+      toast(t("notifEnabled")); state.notify.enabled = true; save(); render(); checkReminders();
+    }else{
+      renderPermStatus(); toast(t("permInsecure"));
+    }
+  }else{
+    renderPermStatus(); toast(t("permDenied"));
+  }
+});
+$("#testBtn").addEventListener("click", () => {
+  if(!notifySupported() || Notification.permission !== "granted" || !window.isSecureContext){
+    toast(t("notifUnavailable")); return;
+  }
+  if(fireNotification("UpkeepTrack", t("testSent"))) toast(t("testSent"));
+});
+
 $("#exportBtn").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify({ app:"UpkeepTrack", version:1, exportedAt:new Date().toISOString(), items:state.items }, null, 2)], { type:"application/json" });
   const a = document.createElement("a");
@@ -1214,6 +1412,8 @@ lang = state.lang;
 document.documentElement.lang = lang;
 document.title = lang === "zh" ? "UpkeepTrack — 家庭物品保养与保修跟踪" : "UpkeepTrack — Home Maintenance & Warranty Tracker";
 render();
+checkReminders();          // notify immediately for anything already due
+setInterval(checkReminders, 60000); // …and keep watching while the tab is open
 </script>
 </body>
 </html>
