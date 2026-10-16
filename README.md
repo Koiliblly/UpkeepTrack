@@ -21,6 +21,7 @@ UpkeepTrack takes the opposite route: **one HTML file you double-click**. Your d
 | 🧰 **Recurring maintenance** | tasks with custom intervals (e.g. "wash AC filter every 90 days"); next due date is computed from the last time you did it |
 | ✅ **One-click "Mark done"** | logs the date automatically and schedules the next occurrence |
 | 🔔 **Browser notifications** | optional reminders when a task comes due or a warranty expires — lead time configurable (same day / 1 / 3 / 7 days) |
+| 🔔 **In-app reminder center** | a bell in the header lists due tasks and expiring/expired warranties with one-tap **Mark done** — works fully offline, no system permission needed |
 | 📊 **Dashboard** | stats, a "needs attention" list (expiring warranties + overdue tasks) and a 30-day timeline |
 | 🔍 **Search & filters** | full-text search, category chips, warranty-status filter |
 | 🌐 **Bilingual** | English and 中文, switchable in one click |
@@ -41,6 +42,10 @@ UpkeepTrack takes the opposite route: **one HTML file you double-click**. Your d
 | Settings | Chinese UI |
 |---|---|
 | ![Settings](screenshots/settings.png) | ![中文界面](screenshots/dashboard-zh.png) |
+
+| Reminder center (bell) |
+|---|
+| ![Reminders](screenshots/reminders.png) |
 
 ## 🚀 Quick start
 

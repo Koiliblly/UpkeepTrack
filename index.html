@@ -313,6 +313,23 @@ footer{max-width:1080px;margin:0 auto;padding:8px 20px 36px;color:var(--faint);f
 footer a{color:var(--muted);font-weight:600}
 
 /* ---- 6. Responsive ---- */
+[hidden]{display:none !important}
+.bell-badge{
+  position:absolute;top:3px;right:3px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;
+  background:var(--danger);color:#fff;font-size:10px;font-weight:800;line-height:1;place-items:center;
+  box-shadow:0 0 0 2px var(--card);display:none;
+}
+.reminder-panel{
+  position:fixed;top:66px;right:20px;width:min(380px,calc(100vw - 32px));max-height:min(560px,calc(100vh - 100px));
+  background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-lg);
+  z-index:55;display:flex;flex-direction:column;overflow:hidden;animation:pop .18s ease;
+}
+.rem-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.rem-head b{font-size:14px;font-weight:800;flex:1}
+.rem-body{padding:12px 14px;overflow:auto;display:grid;gap:8px}
+.rem-empty{text-align:center;color:var(--muted);font-size:13px;padding:20px 6px}
+.rem-group{font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:6px 2px 2px}
+.rem-group:first-child{margin-top:0}
 @media(max-width:640px){
   .brand .sub{display:none}
   .topbar-inner{padding:12px 16px}
@@ -340,6 +357,10 @@ footer a{color:var(--muted);font-weight:600}
       </div>
     </div>
     <div class="topbar-right">
+      <button class="icon-btn" id="bellBtn" title="Reminders" aria-label="Reminders" style="position:relative">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="bell-badge" id="bellBadge"></span>
+      </button>
       <button class="lang-btn" id="langBtn" title="Language">中文</button>
       <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
         <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -354,6 +375,12 @@ footer a{color:var(--muted);font-weight:600}
     </div>
   </div>
 </header>
+
+<!-- ===================== Reminder center ===================== -->
+<div id="reminderPanel" class="reminder-panel" hidden>
+  <div class="rem-head"><b id="rem-title">Reminders</b><button class="mini-btn ghost" id="rem-close">✕</button></div>
+  <div id="rem-body" class="rem-body"></div>
+</div>
 
 <!-- ===================== Tabs ===================== -->
 <nav class="tabs" id="tabs">
@@ -564,6 +591,7 @@ const I18N = {
     permInsecure:"Browser notifications need http://localhost or https — open the app via a local server (file:// blocks them).",
     notifEnabled:"Notifications enabled", notifDisabled:"Notifications disabled", testSent:"Test notification sent", notifUnavailable:"Notifications unavailable here — open the app via http://localhost.",
     ntfTask:"Maintenance due", ntfWarranty:"Warranty", ntfExpires:"Expires", ntfDue:"Due", ntfOverdue:"overdue",
+    remTitle:"Reminders", remOverdue:"Overdue tasks", remDue:"Due soon", remWarnExp:"Warranties expiring", remWarnExpired:"Warranties expired", remEmpty:"All caught up — nothing needs attention.",
     nextUp:"Next task", noTasks:"No maintenance tasks yet.",
     setGeneral:"General", setTheme:"Dark theme", setThemeDesc:"Easier on the eyes at night. Stored on this device.",
     setLang:"Language", setLangDesc:"Interface language.",
@@ -615,6 +643,7 @@ const I18N = {
     permInsecure:"浏览器通知需要 http://localhost 或 https——请通过本地服务器打开应用（file:// 下不可用）。",
     notifEnabled:"已开启通知", notifDisabled:"已关闭通知", testSent:"测试通知已发送", notifUnavailable:"当前环境无法发送通知——请通过 http://localhost 打开应用。",
     ntfTask:"保养任务到期", ntfWarranty:"保修", ntfExpires:"到期", ntfDue:"到期", ntfOverdue:"已逾期",
+    remTitle:"提醒", remOverdue:"已逾期任务", remDue:"即将到期任务", remWarnExp:"保修即将到期", remWarnExpired:"保修已过期", remEmpty:"一切尽在掌握——暂无需要关注的事项。",
     nextUp:"下一任务", noTasks:"还没有保养任务。",
     setGeneral:"通用", setTheme:"深色主题", setThemeDesc:"夜间更护眼，仅保存在本设备。",
     setLang:"语言", setLangDesc:"界面语言。",
@@ -652,7 +681,7 @@ const OVERDUE = "overdue", DUE = "due", SOON = "soon", LATER = "later", UNSCHEDU
 
 /* ---------- 3. State & persistence ---------- */
 const LS_KEY = "upkeeptrack.v1";
-let state = { items: [], theme: "light", lang: "en", notify: { enabled:false, lead:1 }, notified: {} };
+let state = { items: [], theme: "light", lang: "en", notify: { enabled:false, lead:1 }, notified: {}, notifiedInApp: {} };
 
 function save(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
@@ -671,6 +700,7 @@ function load(){
       lead: (data.notify && Number.isFinite(Number(data.notify.lead))) ? Number(data.notify.lead) : 1
     };
     state.notified = (data.notified && typeof data.notified === "object") ? data.notified : {};
+    state.notifiedInApp = (data.notifiedInApp && typeof data.notifiedInApp === "object") ? data.notifiedInApp : {};
   }catch(e){ /* corrupted storage → start fresh */ }
 }
 
@@ -789,6 +819,8 @@ function applyStatic(){
   for(const id in map){ const n = document.getElementById(id); if(n) n.textContent = t(map[id]); }
   $("#searchInput").placeholder = t("searchPlaceholder");
   $("#addBtn").title = t("addItem");
+  $("#bellBtn").title = t("remTitle");
+  const rt = document.getElementById("rem-title"); if(rt) rt.textContent = t("remTitle");
   $("#themeBtn").title = t("setTheme");
   $("#statusFilter").innerHTML =
     `<option value="all">${t("allStatuses")}</option>
@@ -820,6 +852,8 @@ function render(){
   renderItems();
   renderMaintenance();
   renderSettings();
+  renderReminderBadge();
+  if(!$("#reminderPanel").hidden) renderReminderPanel();
   updateTabs();
 }
 
@@ -1007,7 +1041,7 @@ function renderMaintenance(){
 
 /* --- Settings --- */
 function renderSettings(){
-  $("#about-text").textContent = `UpkeepTrack v1.1 — ${t("tagline")}. Built with vanilla JavaScript, zero dependencies. MIT license.`;
+  $("#about-text").textContent = `UpkeepTrack v1.2 — ${t("tagline")}. Built with vanilla JavaScript, zero dependencies. MIT license.`;
 }
 
 /* ---------- 7. Modals ---------- */
@@ -1154,11 +1188,8 @@ function openDetail(id){
       </div>`;
     }).join("");
     box.querySelectorAll("[data-done]").forEach(b => b.onclick = () => {
-      const tk = allTasks(it).find(x => x.id === b.dataset.done);
-      tk.lastDone = todayISO(); tk.log = tk.log || [];
-      if(tk.log[tk.log.length-1] !== todayISO()) tk.log.push(todayISO());
-      if(tk.log.length > 30) tk.log = tk.log.slice(-30);
-      save(); renderTasks(); render(); toast(t("taskDone"));
+      completeTask(it.id, b.dataset.done);
+      renderTasks();
     });
     box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
       it.tasks = allTasks(it).filter(x => x.id !== b.dataset.del);
@@ -1203,12 +1234,97 @@ function fireNotification(title, body){
   }catch(e){ return false; }
 }
 
-// Called on start and every minute: notify once per due event (task/warranty) per occurrence.
-function checkReminders(){
-  if(!state.notify.enabled || !notifySupported() || Notification.permission !== "granted" || !window.isSecureContext) return;
+// Shared helper: record that a maintenance task was just completed.
+function completeTask(itemId, taskId){
+  const it = state.items.find(x => x.id === itemId);
+  const tk = it && allTasks(it).find(x => x.id === taskId);
+  if(!tk) return false;
+  tk.lastDone = todayISO(); tk.log = tk.log || [];
+  if(tk.log[tk.log.length-1] !== todayISO()) tk.log.push(todayISO());
+  if(tk.log.length > 30) tk.log = tk.log.slice(-30);
+  save(); render(); toast(t("taskDone"));
+  return true;
+}
+
+// Collect everything that currently needs attention (for the bell badge & panel).
+function activeReminders(){
+  const tasks = [], warns = [];
+  state.items.forEach(it => {
+    allTasks(it).forEach(tk => {
+      const st = taskStatus(tk);
+      if(st === OVERDUE || st === DUE) tasks.push({ item:it, task:tk, st, when:nextDue(tk) });
+    });
+    const ws = warrantyStatus(it);
+    if(ws === EXPIRING || ws === EXPIRED) warns.push({ item:it, ws, when:warrantyEnd(it) });
+  });
+  tasks.sort((a, b) => (a.when || "9999").localeCompare(b.when || "9999"));
+  warns.sort((a, b) => (a.when || "9999").localeCompare(b.when || "9999"));
+  return { tasks, warns };
+}
+function renderReminderBadge(){
+  const n = activeReminders().tasks.length + activeReminders().warns.length;
+  const b = $("#bellBadge");
+  if(n > 0){ b.style.display = "grid"; b.textContent = n > 99 ? "99+" : n; }
+  else b.style.display = "none";
+}
+function renderReminderPanel(){
+  const { tasks, warns } = activeReminders();
+  const body = $("#rem-body");
+  if(!tasks.length && !warns.length){
+    body.innerHTML = `<div class="rem-empty">🎉 ${esc(t("remEmpty"))}</div>`;
+    return;
+  }
+  const overdue = tasks.filter(x => x.st === OVERDUE);
+  const due = tasks.filter(x => x.st === DUE);
+  const expiring = warns.filter(x => x.ws === EXPIRING);
+  const expired = warns.filter(x => x.ws === EXPIRED);
+  const taskRow = r => `<div class="task-row" style="margin-bottom:0">
+    <div class="grow"><div class="nm">${esc(r.item.icon)} ${esc(r.task.name)}</div>
+    <div class="meta">${esc(r.item.name)} · ${fmtDate(r.when)}</div></div>
+    <button class="mini-btn" data-done="${r.item.id}|${r.task.id}">${t("markDone")}</button></div>`;
+  const warnRow = r => `<div class="task-row" style="margin-bottom:0">
+    <div class="grow"><div class="nm">${esc(r.item.icon)} ${esc(r.item.name)}</div>
+    <div class="meta">${r.ws === EXPIRED ? t("attWarrantyExpired") : t("attWarranty")} · ${fmtDate(r.when)}</div></div>
+    <span class="badge ${r.ws === EXPIRED ? "danger" : "warn"}">${t(r.ws === EXPIRED ? "warrantyExpired" : "warrantyExpiring")}</span></div>`;
+  let html = "";
+  if(overdue.length) html += `<div class="rem-group">⚠️ ${esc(t("remOverdue"))} (${overdue.length})</div>` + overdue.map(taskRow).join("");
+  if(due.length) html += `<div class="rem-group">⏰ ${esc(t("remDue"))} (${due.length})</div>` + due.map(taskRow).join("");
+  if(expiring.length) html += `<div class="rem-group">⏳ ${esc(t("remWarnExp"))} (${expiring.length})</div>` + expiring.map(warnRow).join("");
+  if(expired.length) html += `<div class="rem-group">🚫 ${esc(t("remWarnExpired"))} (${expired.length})</div>` + expired.map(warnRow).join("");
+  body.innerHTML = html;
+}
+
+// Mark currently-due events as already seen in-app so the first load stays quiet;
+// they remain visible in the reminder center, and only NEW transitions toast.
+function seedInApp(){
+  if(!state.notifiedInApp) state.notifiedInApp = {};
   const today = todayISO();
   const horizon = addDaysTo(today, state.notify.lead ?? 1);
-  let fired = 0;
+  let added = false;
+  state.items.forEach(it => {
+    const end = warrantyEnd(it);
+    if(end && end <= horizon){
+      const key = "w:" + it.id + ":" + end;
+      if(!state.notified[key] && !state.notifiedInApp[key]){ state.notifiedInApp[key] = today; added = true; }
+    }
+    allTasks(it).forEach(tk => {
+      const due = nextDue(tk);
+      if(due && due <= horizon){
+        const key = "t:" + it.id + ":" + tk.id + ":" + due;
+        if(!state.notified[key] && !state.notifiedInApp[key]){ state.notifiedInApp[key] = today; added = true; }
+      }
+    });
+  });
+  if(added) save();
+}
+
+// Called on start and every minute: notify once per due event (task/warranty) per occurrence.
+// System notifications are preferred; when unavailable, an in-app toast is shown instead.
+function checkReminders(){
+  const today = todayISO();
+  const horizon = addDaysTo(today, state.notify.lead ?? 1);
+  const sysReady = state.notify.enabled && notifySupported() && Notification.permission === "granted" && window.isSecureContext;
+  let changed = false;
   state.items.forEach(it => {
     const end = warrantyEnd(it);
     if(end && end <= horizon){
@@ -1217,8 +1333,12 @@ function checkReminders(){
         const st = warrantyStatus(it);
         const rel = st === EXPIRED ? t("ntfOverdue") : fmtRel(end);
         const title = t("ntfWarranty") + " " + t(st === EXPIRED ? "warrantyExpired" : "warrantyExpiring") + ": " + it.name;
-        if(fireNotification(title, t("ntfExpires") + " " + fmtDate(end) + " (" + rel + ")")){
-          state.notified[key] = today; fired++;
+        const body = t("ntfExpires") + " " + fmtDate(end) + " (" + rel + ")";
+        if(sysReady && fireNotification(title, body)){
+          state.notified[key] = today; changed = true;
+        }else if(!state.notifiedInApp[key]){
+          state.notifiedInApp[key] = today; changed = true;
+          toast("🔔 " + title + " — " + body);
         }
       }
     }
@@ -1230,18 +1350,22 @@ function checkReminders(){
           const st = taskStatus(tk);
           const rel = st === OVERDUE ? t("ntfOverdue") : fmtRel(due);
           const title = t("ntfTask") + ": " + tk.name;
-          if(fireNotification(title, it.name + " — " + t("ntfDue") + " " + fmtDate(due) + " (" + rel + ")")){
-            state.notified[key] = today; fired++;
+          const body = it.name + " — " + t("ntfDue") + " " + fmtDate(due) + " (" + rel + ")";
+          if(sysReady && fireNotification(title, body)){
+            state.notified[key] = today; changed = true;
+          }else if(!state.notifiedInApp[key]){
+            state.notifiedInApp[key] = today; changed = true;
+            toast("🔔 " + title + " — " + body);
           }
         }
       }
     });
   });
-  if(fired > 0){
+  if(changed){
     // Drop keys older than a week to keep storage small.
     const cutoff = addDaysTo(today, -7);
-    Object.keys(state.notified).forEach(k => { if(state.notified[k] < cutoff) delete state.notified[k]; });
-    save();
+    [state.notified, state.notifiedInApp].forEach(store => Object.keys(store).forEach(k => { if(store[k] < cutoff) delete store[k]; }));
+    save(); render();
   }
 }
 
@@ -1278,14 +1402,7 @@ $("#itemsGrid").addEventListener("click", e => {
 // Maintenance view: mark a task as done (delegated, buttons carry "itemId|taskId").
 $("#maintenance-groups").addEventListener("click", e => {
   const b = e.target.closest("[data-done]"); if(!b) return;
-  const [itemId, taskId] = b.dataset.done.split("|");
-  const it = state.items.find(x => x.id === itemId);
-  const tk = it && allTasks(it).find(x => x.id === taskId);
-  if(!tk) return;
-  tk.lastDone = todayISO(); tk.log = tk.log || [];
-  if(tk.log[tk.log.length-1] !== todayISO()) tk.log.push(todayISO());
-  if(tk.log.length > 30) tk.log = tk.log.slice(-30);
-  save(); render(); toast(t("taskDone"));
+  completeTask(...b.dataset.done.split("|"));
 });
 $("#catChips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if(!b) return;
@@ -1313,6 +1430,22 @@ function setLang(l){
   document.title = l === "zh" ? "UpkeepTrack — 家庭物品保养与保修跟踪" : "UpkeepTrack — Home Maintenance & Warranty Tracker";
   save(); render();
 }
+
+/* Reminder center (bell) — works without system notifications. */
+$("#bellBtn").addEventListener("click", () => {
+  const p = $("#reminderPanel");
+  p.hidden = !p.hidden;
+  if(!p.hidden) renderReminderPanel();
+});
+$("#rem-close").addEventListener("click", () => { $("#reminderPanel").hidden = true; });
+document.addEventListener("mousedown", e => {
+  const p = $("#reminderPanel");
+  if(!p.hidden && !p.contains(e.target) && !$("#bellBtn").contains(e.target)) p.hidden = true;
+});
+$("#reminderPanel").addEventListener("click", e => {
+  const b = e.target.closest("[data-done]"); if(!b) return;
+  completeTask(...b.dataset.done.split("|"));
+});
 
 // Settings actions.
 $("#notifToggle").addEventListener("change", async e => {
@@ -1412,6 +1545,7 @@ lang = state.lang;
 document.documentElement.lang = lang;
 document.title = lang === "zh" ? "UpkeepTrack — 家庭物品保养与保修跟踪" : "UpkeepTrack — Home Maintenance & Warranty Tracker";
 render();
+seedInApp();               // existing due items land in the reminder center (quiet first load)
 checkReminders();          // notify immediately for anything already due
 setInterval(checkReminders, 60000); // …and keep watching while the tab is open
 </script>
