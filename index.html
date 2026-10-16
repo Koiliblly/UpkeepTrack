@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UpkeepTrack — Home Maintenance &amp; Warranty Tracker</title>
+<meta name="description" content="A zero-install, offline-first web app to track your home items, warranties and recurring maintenance tasks.">
+<style>
+/* ============================================================
+   UpkeepTrack — Home Maintenance & Warranty Tracker
+   Single-file, zero-dependency, offline-first vanilla JS app.
+   Sections: 1) Design tokens  2) Base layout  3) Components
+             4) Views         5) Modals/toasts  6) Responsive
+   ============================================================ */
+
+/* ---- 1. Design tokens ---- */
+:root{
+  --bg:#f4f6f8;
+  --bg-grad:radial-gradient(1200px 500px at 15% -10%, #e6f7f0 0%, var(--bg) 55%);
+  --card:#ffffff;
+  --card-2:#fafbfc;
+  --border:#e5e9ee;
+  --text:#16202a;
+  --muted:#6b7684;
+  --faint:#9aa4b0;
+  --accent:#0ea371;
+  --accent-soft:#e3f5ec;
+  --warn:#d97706;
+  --warn-soft:#fdf0dc;
+  --danger:#e11d48;
+  --danger-soft:#fde8ee;
+  --info:#0284c7;
+  --info-soft:#e0f2fe;
+  --shadow:0 1px 2px rgba(22,32,42,.05),0 8px 24px -12px rgba(22,32,42,.14);
+  --shadow-lg:0 20px 50px -20px rgba(22,32,42,.28);
+  --radius:16px;
+  --radius-sm:10px;
+}
+[data-theme="dark"]{
+  --bg:#0e1216;
+  --bg-grad:radial-gradient(1200px 500px at 15% -10%, #0d2018 0%, var(--bg) 55%);
+  --card:#161c23;
+  --card-2:#1b222b;
+  --border:#262f39;
+  --text:#e6ebf0;
+  --muted:#97a3b0;
+  --faint:#64707c;
+  --accent:#22c98e;
+  --accent-soft:#123529;
+  --warn:#f0a63a;
+  --warn-soft:#33290f;
+  --danger:#fb5f7d;
+  --danger-soft:#331a22;
+  --info:#38bdf8;
+  --info-soft:#0d2b3a;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+  --shadow-lg:0 20px 50px -18px rgba(0,0,0,.65);
+}
+
+/* ---- 2. Base ---- */
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;
+  color:var(--text);min-height:100vh;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;color:var(--text)}
+::placeholder{color:var(--faint)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+/* ---- 3. Topbar & tabs ---- */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  background:color-mix(in srgb, var(--bg) 78%, transparent);
+  border-bottom:1px solid var(--border);
+}
+.topbar-inner{display:flex;align-items:center;gap:14px;padding:14px 20px;max-width:1080px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em;white-space:nowrap}
+.brand svg{width:30px;height:30px;flex:none}
+.brand .sub{font-size:12px;font-weight:600;color:var(--muted);margin-top:1px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.icon-btn{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  border:1px solid var(--border);background:var(--card);color:var(--muted);
+  transition:.18s ease;
+}
+.icon-btn:hover{color:var(--accent);border-color:var(--accent);transform:translateY(-1px)}
+.icon-btn svg{width:18px;height:18px}
+.lang-btn{
+  height:38px;padding:0 12px;border-radius:12px;border:1px solid var(--border);
+  background:var(--card);font-weight:700;font-size:13px;color:var(--muted);transition:.18s ease;
+}
+.lang-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+.tabs{display:flex;gap:6px;max-width:1080px;margin:18px auto 0;padding:0 20px;flex-wrap:wrap}
+.tab{
+  padding:9px 18px;border-radius:999px;font-weight:600;font-size:14px;color:var(--muted);
+  border:1px solid transparent;transition:.18s ease;display:flex;align-items:center;gap:7px;
+}
+.tab:hover{color:var(--text);background:var(--card);border-color:var(--border)}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 6px 16px -6px color-mix(in srgb,var(--accent) 60%, transparent)}
+.tab .dot{width:7px;height:7px;border-radius:50%;background:var(--danger);display:none}
+.tab .dot.show{display:block}
+
+/* ---- 4. Views & cards ---- */
+.view{display:none;max-width:1080px;margin:0 auto;padding:22px 20px 60px}
+.view.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+.stat{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow);transition:.18s ease;
+}
+.stat:hover{transform:translateY(-2px)}
+.stat .num{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.stat .lbl{font-size:13px;color:var(--muted);font-weight:600;margin-top:2px}
+.stat .num.danger{color:var(--danger)} .stat .num.warn{color:var(--warn)} .stat .num.ok{color:var(--accent)} .stat .num.info{color:var(--info)}
+
+.panel{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:18px 20px;margin-bottom:20px;
+}
+.panel h3{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.panel h3 .badge{margin-left:auto}
+
+.row{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}
+@media(max-width:840px){.row{grid-template-columns:1fr}}
+
+/* Items grid */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.search-box{
+  flex:1;min-width:220px;display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 12px;transition:.18s;
+}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search-box svg{width:16px;height:16px;color:var(--faint);flex:none}
+.search-box input{flex:1;border:none;outline:none;background:none;font-size:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  padding:7px 14px;border-radius:999px;font-size:13px;font-weight:600;
+  border:1px solid var(--border);background:var(--card);color:var(--muted);transition:.15s;
+}
+.chip:hover{color:var(--text)}
+.chip.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+select.filter{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 12px;
+  font-size:13px;font-weight:600;color:var(--text);outline:none;
+}
+
+.items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.item-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:16px;cursor:pointer;transition:.18s ease;position:relative;overflow:hidden;
+}
+.item-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--accent) 35%, var(--border))}
+.item-card .top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.item-ico{
+  width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:21px;flex:none;
+  background:var(--card-2);border:1px solid var(--border);
+}
+.item-card h4{font-size:15px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;color:#fff;flex:none}
+.warranty{margin:8px 0 6px}
+.warranty .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.bar{height:7px;border-radius:999px;background:var(--card-2);border:1px solid var(--border);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#34d399);transition:width .4s ease}
+.bar.warn i{background:linear-gradient(90deg,var(--warn),#fbbf24)}
+.bar.danger i{background:linear-gradient(90deg,var(--danger),#fb7185)}
+.item-foot{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--muted);font-weight:600}
+.item-foot svg{width:14px;height:14px}
+.badge{
+  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
+  padding:3px 10px;border-radius:999px;line-height:1.5;
+}
+.badge.ok{background:var(--accent-soft);color:var(--accent)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.danger{background:var(--danger-soft);color:var(--danger)}
+.badge.info{background:var(--info-soft);color:var(--info)}
+.badge.muted{background:var(--card-2);color:var(--muted);border:1px solid var(--border)}
+
+/* Task rows */
+.task-row{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--card-2);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;
+}
+.task-row .grow{flex:1;min-width:0}
+.task-row .nm{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-row .meta{font-size:12px;color:var(--muted);margin-top:1px}
+.mini-btn{
+  padding:7px 13px;border-radius:10px;font-size:12.5px;font-weight:700;white-space:nowrap;
+  background:var(--accent);color:#fff;transition:.15s;box-shadow:0 4px 10px -4px color-mix(in srgb,var(--accent) 55%, transparent);
+}
+.mini-btn:hover{filter:brightness(1.08)}
+.mini-btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border);box-shadow:none}
+.mini-btn.ghost:hover{color:var(--danger);border-color:var(--danger)}
+.mini-btn.danger{background:var(--danger)}
+
+/* Timeline */
+.tl{position:relative;padding-left:22px}
+.tl::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--border);border-radius:2px}
+.tl-item{position:relative;padding:8px 0 8px 6px}
+.tl-item::before{
+  content:"";position:absolute;left:-21px;top:14px;width:12px;height:12px;border-radius:50%;
+  background:var(--card);border:3px solid var(--accent);
+}
+.tl-item.warn::before{border-color:var(--warn)} .tl-item.danger::before{border-color:var(--danger)}
+.tl-item .d{font-size:13px;font-weight:800;color:var(--text)}
+.tl-item .t{font-size:13px;color:var(--muted)}
+.empty{padding:36px 10px;text-align:center;color:var(--muted);font-size:14px}
+.empty .big{font-size:38px;margin-bottom:8px}
+
+/* Category distribution */
+.cat-dist{display:grid;gap:9px}
+.cat-line{display:flex;align-items:center;gap:10px;font-size:13px}
+.cat-line .lab{width:120px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;flex:none}
+.cat-line .bar{flex:1}
+.cat-line .val{width:28px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* ---- 5. Modals & toasts ---- */
+.modal-overlay{
+  position:fixed;inset:0;z-index:60;display:none;place-items:center;padding:20px;
+  background:rgba(10,14,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.modal-overlay.open{display:grid;animation:fadeIn .18s ease}
+.modal{
+  width:100%;max-width:560px;max-height:88vh;overflow:auto;
+  background:var(--card);border:1px solid var(--border);border-radius:20px;
+  box-shadow:var(--shadow-lg);animation:pop .2s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+.modal-head{
+  display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:var(--card);z-index:2;border-radius:20px 20px 0 0;
+}
+.modal-head h2{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.modal-body{padding:20px 22px}
+.modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border)}
+
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card-2);
+  outline:none;font-size:14px;transition:.15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field textarea{resize:vertical;min-height:64px}
+.field .hint{font-size:11.5px;color:var(--faint);margin-top:4px}
+.emoji-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.emoji-picker button{
+  width:36px;height:36px;border-radius:10px;font-size:18px;border:1px solid var(--border);
+  background:var(--card-2);display:grid;place-items:center;transition:.12s;
+}
+.emoji-picker button:hover{border-color:var(--accent);transform:scale(1.08)}
+.emoji-picker button.sel{background:var(--accent-soft);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+.btn{
+  padding:10px 20px;border-radius:12px;font-weight:700;font-size:14px;
+  background:var(--accent);color:#fff;transition:.15s;
+  box-shadow:0 6px 16px -6px color-mix(in srgb,var(--accent) 55%, transparent);
+}
+.btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.btn.ghost{background:var(--card-2);color:var(--text);border:1px solid var(--border);box-shadow:none}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn.danger{background:var(--danger);box-shadow:0 6px 16px -6px color-mix(in srgb,var(--danger) 55%, transparent)}
+.btn.sm{padding:7px 13px;font-size:12.5px;border-radius:10px}
+
+#toast-root{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:90;display:grid;gap:8px;justify-items:center}
+.toast{
+  background:var(--text);color:var(--bg);padding:10px 20px;border-radius:999px;
+  font-size:13.5px;font-weight:700;box-shadow:var(--shadow-lg);animation:pop .22s ease;
+}
+
+/* Detail modal */
+.detail-hero{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.detail-hero .ico{width:56px;height:56px;border-radius:16px;font-size:28px;display:grid;place-items:center;background:var(--card-2);border:1px solid var(--border)}
+.detail-hero h3{font-size:19px;font-weight:800}
+.detail-hero .meta{font-size:13px;color:var(--muted);margin-top:2px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+@media(max-width:560px){.detail-grid{grid-template-columns:1fr}}
+.detail-cell{background:var(--card-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.detail-cell .k{font-size:11.5px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.detail-cell .v{font-size:15px;font-weight:800;margin-top:2px}
+.notes-box{margin-bottom:16px}
+.notes-box .k{font-size:11.5px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.notes-box .v{font-size:13.5px;color:var(--muted);background:var(--card-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;white-space:pre-wrap}
+
+/* Settings */
+.set-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
+.set-row:last-child{border-bottom:none}
+.set-row .grow{flex:1}
+.set-row h4{font-size:14.5px;font-weight:700}
+.set-row p{font-size:12.5px;color:var(--muted);margin-top:2px}
+.switch{position:relative;width:46px;height:26px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{
+  position:absolute;inset:0;border-radius:999px;background:var(--border);transition:.2s;cursor:pointer;
+}
+.switch span::before{
+  content:"";position:absolute;width:20px;height:20px;border-radius:50%;left:3px;top:3px;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.2s;
+}
+.switch input:checked + span{background:var(--accent)}
+.switch input:checked + span::before{transform:translateX(20px)}
+
+/* Footer */
+footer{max-width:1080px;margin:0 auto;padding:8px 20px 36px;color:var(--faint);font-size:12px;text-align:center}
+footer a{color:var(--muted);font-weight:600}
+
+/* ---- 6. Responsive ---- */
+@media(max-width:640px){
+  .brand .sub{display:none}
+  .topbar-inner{padding:12px 16px}
+  .tabs,.view{padding-left:16px;padding-right:16px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .modal{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== Topbar ===================== -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M4 16 L16 6 L28 16" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 14.5 V26 H24 V14.5" stroke="var(--text)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+        <path d="M12 26 V20 H20 V26" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="15.5" cy="12.5" r="1.6" fill="var(--warn)"/>
+      </svg>
+      <div>
+        <div>UpkeepTrack</div>
+        <div class="sub" id="tagline">Home maintenance &amp; warranty tracker</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="lang-btn" id="langBtn" title="Language">中文</button>
+      <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="addBtn" title="Add item" aria-label="Add item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== Tabs ===================== -->
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-view="dashboard"><span id="tab-dashboard">Dashboard</span></button>
+  <button class="tab" data-view="items"><span id="tab-items">Items</span><span class="dot" id="dot-items"></span></button>
+  <button class="tab" data-view="maintenance"><span id="tab-maintenance">Maintenance</span><span class="dot" id="dot-maintenance"></span></button>
+  <button class="tab" data-view="settings"><span id="tab-settings">Settings</span></button>
+</nav>
+
+<!-- ===================== Dashboard ===================== -->
+<main>
+<section id="view-dashboard" class="view active">
+  <div class="stat-grid" id="stats"></div>
+  <div class="row">
+    <div>
+      <div class="panel">
+        <h3><span id="hd-attention">Needs attention</span></h3>
+        <div id="attention-list"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <h3><span id="hd-timeline">Upcoming 30 days</span></h3>
+        <div id="timeline"></div>
+      </div>
+      <div class="panel">
+        <h3><span id="hd-cats">Items by category</span></h3>
+        <div class="cat-dist" id="cat-dist"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Items ===================== -->
+<section id="view-items" class="view">
+  <div class="toolbar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchInput" placeholder="Search items…" autocomplete="off">
+    </div>
+    <select class="filter" id="statusFilter">
+      <option value="all">All statuses</option>
+      <option value="active">Warranty active</option>
+      <option value="expiring">Expiring soon</option>
+      <option value="expired">Warranty expired</option>
+      <option value="none">No warranty</option>
+    </select>
+  </div>
+  <div class="chips" id="catChips"></div>
+  <div class="items-grid" id="itemsGrid" style="margin-top:16px"></div>
+</section>
+
+<!-- ===================== Maintenance ===================== -->
+<section id="view-maintenance" class="view">
+  <div id="maintenance-groups"></div>
+</section>
+
+<!-- ===================== Settings ===================== -->
+<section id="view-settings" class="view">
+  <div class="panel">
+    <h3><span id="set-general">General</span></h3>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-theme">Dark theme</h4>
+        <p id="set-theme-desc">Easier on the eyes at night. Stored on this device.</p>
+      </div>
+      <label class="switch"><input type="checkbox" id="darkToggle"><span></span></label>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-lang">Language</h4>
+        <p id="set-lang-desc">Interface language.</p>
+      </div>
+      <select class="filter" id="langSelect" style="min-width:110px">
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3><span id="set-data">Data</span></h3>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-export">Export data</h4>
+        <p id="set-export-desc">Download all your items as a JSON backup file.</p>
+      </div>
+      <button class="btn ghost sm" id="exportBtn">Export</button>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-import">Import data</h4>
+        <p id="set-import-desc">Restore from a JSON backup. Replaces current data.</p>
+      </div>
+      <button class="btn ghost sm" id="importBtn">Import</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-demo">Load demo data</h4>
+        <p id="set-demo-desc">Adds a realistic sample household so you can explore the app.</p>
+      </div>
+      <button class="btn ghost sm" id="demoBtn">Load demo</button>
+    </div>
+    <div class="set-row">
+      <div class="grow">
+        <h4 id="set-clear">Erase all data</h4>
+        <p id="set-clear-desc">Permanently remove every item and task from this device.</p>
+      </div>
+      <button class="btn danger sm" id="clearBtn">Erase</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3><span id="set-about">About</span></h3>
+    <p style="font-size:13.5px;color:var(--muted)" id="about-text"></p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <span>UpkeepTrack</span> · <a href="https://github.com/Koiliblly/UpkeepTrack" target="_blank" rel="noopener">GitHub</a> · <span id="footer-privacy">100% local &amp; offline</span>
+</footer>
+
+<!-- Modal + toast roots -->
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   UpkeepTrack v1.0 — vanilla JS, zero dependencies
+   All state lives in localStorage under "upkeeptrack.v1".
+   ============================================================ */
+
+/* ---------- 1. i18n ---------- */
+const I18N = {
+  en: {
+    tagline:"Home maintenance & warranty tracker",
+    tabDashboard:"Dashboard", tabItems:"Items", tabMaintenance:"Maintenance", tabSettings:"Settings",
+    statItems:"Items", statWarranty:"Active warranties", statExpiring:"Expiring soon", statOverdue:"Overdue tasks",
+    hdAttention:"Needs attention", hdTimeline:"Upcoming 30 days", hdCats:"Items by category",
+    none:"None", searchPlaceholder:"Search items…", allStatuses:"All statuses",
+    stActive:"Warranty active", stExpiring:"Expiring soon", stExpired:"Warranty expired", stNone:"No warranty",
+    all:"All", expires:"Expires", expiredAgo:"Expired", noWarranty:"No warranty",
+    warrantyActive:"Active", warrantyExpiring:"Expiring", warrantyExpired:"Expired",
+    taskOverdue:"Overdue", taskDue:"Due", taskSoon:"Soon", taskLater:"Later", taskUnscheduled:"Unscheduled",
+    lastDone:"Last done", nextDue:"Next due", never:"Never", today:"Today", daysLeft:"{n}d left",
+    tasksDue:"tasks due", task:"task", done:"Done",
+    addItem:"Add item", editItem:"Edit item", itemName:"Name", category:"Category",
+    purchaseDate:"Purchase date", warrantyMonths:"Warranty length (months)", warrantyHint:"Leave empty if there is no warranty.",
+    notes:"Notes", notesPh:"Anything worth remembering…", save:"Save", cancel:"Cancel", delete:"Delete",
+    tasks:"Maintenance tasks", addTask:"Add task", taskName:"Task name", intervalDays:"Repeat every (days)",
+    lastDoneDate:"Last done on", addTaskBtn:"Add task", markDone:"Mark done", deleteTask:"Delete task",
+    taskHint:"e.g. 90 days for an air filter, 180 for oil changes.",
+    detailWarranty:"Warranty", detailPurchased:"Purchased", detailExpires:"Expires", detailDaysLeft:"Days left",
+    confirmTitle:"Are you sure?", confirmDeleteItem:"This will permanently delete the item and all its tasks.",
+    confirmClear:"This will permanently erase ALL data on this device. Continue?",
+    confirmImport:"Importing will REPLACE the current data with the backup. Continue?",
+    yesDelete:"Yes, delete", yesErase:"Yes, erase", yesImport:"Yes, import", cancelShort:"Cancel",
+    itemDeleted:"Item deleted", taskAdded:"Task added", taskDeleted:"Task deleted",
+    taskDone:"Task marked as done", itemSaved:"Item saved", dataImported:"Data imported", dataExported:"Data exported",
+    demoLoaded:"Demo data loaded", allCleared:"All data erased", invalidFile:"Invalid backup file",
+    nameRequired:"Please enter a name.", taskNameReq:"Please enter a task name and a valid interval.",
+    nextUp:"Next task", noTasks:"No maintenance tasks yet.",
+    setGeneral:"General", setTheme:"Dark theme", setThemeDesc:"Easier on the eyes at night. Stored on this device.",
+    setLang:"Language", setLangDesc:"Interface language.",
+    setData:"Data", setExport:"Export data", setExportDesc:"Download all your items as a JSON backup file.",
+    setImport:"Import data", setImportDesc:"Restore from a JSON backup. Replaces current data.",
+    setDemo:"Load demo data", setDemoDesc:"Adds a realistic sample household so you can explore the app.",
+    setClear:"Erase all data", setClearDesc:"Permanently remove every item and task from this device.",
+    exportShort:"Export", importShort:"Import", demoShort:"Load demo", eraseShort:"Erase",
+    setAbout:"About", footerPrivacy:"100% local & offline",
+    attWarranty:"warranty expiring", attWarrantyExpired:"warranty expired", attOverdue:"overdue task", attDue:"task due",
+    emptyItems:"No items yet. Add your first item to get started.",
+    emptyTasks:"No tasks due in the next 30 days.",
+    emptyAttention:"Everything is under control. Nothing needs attention.",
+    noTasksShort:"No tasks", addFirst:"Add item"
+  },
+  zh: {
+    tagline:"家庭物品保养与保修跟踪",
+    tabDashboard:"看板", tabItems:"物品", tabMaintenance:"保养", tabSettings:"设置",
+    statItems:"物品总数", statWarranty:"保修有效", statExpiring:"即将到期", statOverdue:"逾期任务",
+    hdAttention:"需要关注", hdTimeline:"未来 30 天", hdCats:"物品分类",
+    none:"无", searchPlaceholder:"搜索物品…", allStatuses:"全部状态",
+    stActive:"保修有效", stExpiring:"即将到期", stExpired:"保修过期", stNone:"无保修",
+    all:"全部", expires:"到期", expiredAgo:"已过期", noWarranty:"无保修",
+    warrantyActive:"有效", warrantyExpiring:"即将到期", warrantyExpired:"已过期",
+    taskOverdue:"已逾期", taskDue:"即将到期", taskSoon:"近期", taskLater:"之后", taskUnscheduled:"未排期",
+    lastDone:"上次完成", nextDue:"下次到期", never:"从未", today:"今天", daysLeft:"剩余 {n} 天",
+    tasksDue:"个任务待做", task:"个任务", done:"完成",
+    addItem:"添加物品", editItem:"编辑物品", itemName:"名称", category:"分类",
+    purchaseDate:"购买日期", warrantyMonths:"保修时长（月）", warrantyHint:"没有保修可留空。",
+    notes:"备注", notesPh:"值得记住的事情…", save:"保存", cancel:"取消", delete:"删除",
+    tasks:"保养任务", addTask:"添加任务", taskName:"任务名称", intervalDays:"重复间隔（天）",
+    lastDoneDate:"上次完成日期", addTaskBtn:"添加任务", markDone:"标记完成", deleteTask:"删除任务",
+    taskHint:"例如：空调滤网 90 天、换机油 180 天。",
+    detailWarranty:"保修", detailPurchased:"购买于", detailExpires:"到期", detailDaysLeft:"剩余天数",
+    confirmTitle:"确定吗？", confirmDeleteItem:"这将永久删除该物品及其所有任务。",
+    confirmClear:"这将永久清除本设备上的所有数据，确定继续吗？",
+    confirmImport:"导入将用备份文件替换当前所有数据，确定继续吗？",
+    yesDelete:"删除", yesErase:"清除", yesImport:"导入", cancelShort:"取消",
+    itemDeleted:"已删除物品", taskAdded:"已添加任务", taskDeleted:"已删除任务",
+    taskDone:"任务已标记完成", itemSaved:"已保存物品", dataImported:"已导入数据", dataExported:"已导出数据",
+    demoLoaded:"已载入示例数据", allCleared:"已清除全部数据", invalidFile:"备份文件无效",
+    nameRequired:"请输入名称。", taskNameReq:"请输入任务名称和有效的间隔天数。",
+    nextUp:"下一任务", noTasks:"还没有保养任务。",
+    setGeneral:"通用", setTheme:"深色主题", setThemeDesc:"夜间更护眼，仅保存在本设备。",
+    setLang:"语言", setLangDesc:"界面语言。",
+    setData:"数据", setExport:"导出数据", setExportDesc:"将所有物品下载为 JSON 备份文件。",
+    setImport:"导入数据", setImportDesc:"从 JSON 备份恢复，将替换当前数据。",
+    setDemo:"载入示例数据", setDemoDesc:"添加一个真实的示例家庭，方便你体验功能。",
+    setClear:"清除全部数据", setClearDesc:"永久移除本设备上的所有物品与任务。",
+    exportShort:"导出", importShort:"导入", demoShort:"载入示例", eraseShort:"清除",
+    setAbout:"关于", footerPrivacy:"100% 本地与离线",
+    attWarranty:"保修即将到期", attWarrantyExpired:"保修已过期", attOverdue:"已逾期任务", attDue:"即将到期任务",
+    emptyItems:"还没有物品，添加第一个物品开始使用吧。",
+    emptyTasks:"未来 30 天没有待做任务。",
+    emptyAttention:"一切尽在掌握，暂无需要关注的事项。",
+    noTasksShort:"无任务", addFirst:"添加物品"
+  }
+};
+let lang = "en";
+const t = k => (I18N[lang][k] ?? k);
+
+/* ---------- 2. Config ---------- */
+const CATEGORIES = {
+  appliance:   { icon:"🔌", en:"Appliance", zh:"家电", color:"#0ea5e9" },
+  electronics: { icon:"📱", en:"Electronics", zh:"数码", color:"#f59e0b" },
+  furniture:   { icon:"🛋️", en:"Furniture", zh:"家具", color:"#f97316" },
+  vehicle:     { icon:"🚗", en:"Vehicle", zh:"出行", color:"#10b981" },
+  plant:       { icon:"🪴", en:"Plant", zh:"植物", color:"#84cc16" },
+  other:       { icon:"📦", en:"Other", zh:"其他", color:"#94a3b8" }
+};
+const EMOJIS = ["🧊","❄️","🍳","🧺","🚿","🛁","🔥","💡","📺","💻","📱","🎧","🖨️","🚨","🔐","🛡️","🪑","🛏️","🛋️","🚪","🖼️","🚗","🚲","🛵","🚙","🪴","🌿","🌵","🌸","🧰","🔧","🔨","📦","🎁","⚽","🎸","🕰️","♨️","🧯","🤖"];
+const DAYS_WARN = 60;          // warranty "expiring soon" threshold
+const DAYS_DUE = 7;            // task "due" threshold
+const DAYS_SOON = 30;          // task "soon" threshold
+const EXPIRING = "expiring", ACTIVE = "active", EXPIRED = "expired", NOWARRANTY = "none";
+const OVERDUE = "overdue", DUE = "due", SOON = "soon", LATER = "later", UNSCHEDULED = "unscheduled";
+
+/* ---------- 3. State & persistence ---------- */
+const LS_KEY = "upkeeptrack.v1";
+let state = { items: [], theme: "light", lang: "en" };
+
+function save(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    state.items = Array.isArray(data.items) ? data.items : [];
+    state.items.forEach(it => { if(!it.id) it.id = uid(); }); // normalize legacy backups
+    state.theme = data.theme === "dark" ? "dark" : "light";
+    state.lang = data.lang === "zh" ? "zh" : "en";
+  }catch(e){ /* corrupted storage → start fresh */ }
+}
+
+/* ---------- 4. Utilities ---------- */
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+// Parse a YYYY-MM-DD string as a local date.
+const parseDate = s => { if(!s) return null; const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const toISO = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+const todayISO = () => toISO(new Date());
+// Whole-day difference between two dates (b - a).
+const daysBetween = (a, b) => Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate()) - Date.UTC(a.getFullYear(),a.getMonth(),a.getDate())) / 864e5);
+const addMonths = (iso, months) => { const d = parseDate(iso); if(!d) return null; d.setMonth(d.getMonth()+months); return toISO(d); };
+const addDaysTo = (iso, days) => { const d = parseDate(iso); if(!d) return null; d.setDate(d.getDate()+days); return toISO(d); };
+
+const catInfo = c => CATEGORIES[c] ?? CATEGORIES.other;
+const catLabel = c => lang === "zh" ? catInfo(c).zh : catInfo(c).en;
+
+function fmtDate(iso){
+  if(!iso) return "—";
+  const d = parseDate(iso);
+  return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { year:"numeric", month:"short", day:"numeric" });
+}
+function fmtRel(iso){
+  if(!iso) return "—";
+  const n = daysBetween(parseDate(todayISO()), parseDate(iso)); // negative = past, positive = future
+  if(n === 0) return t("today");
+  const unit = Math.abs(n);
+  if(lang === "zh") return n < 0 ? `${unit} 天前` : `${unit} 天后`;
+  return n < 0 ? `${unit} day${unit===1?"":"s"} ago` : `in ${unit} day${unit===1?"":"s"}`;
+}
+
+/* Warranty & task status helpers */
+function warrantyEnd(item){
+  if(!item.purchaseDate || !item.warrantyMonths) return null;
+  return addMonths(item.purchaseDate, item.warrantyMonths);
+}
+function warrantyStatus(item){
+  const end = warrantyEnd(item);
+  if(!end) return NOWARRANTY;
+  const n = daysBetween(parseDate(todayISO()), parseDate(end));
+  if(n < 0) return EXPIRED;
+  if(n <= DAYS_WARN) return EXPIRING;
+  return ACTIVE;
+}
+function nextDue(task){
+  return task.lastDone && task.intervalDays ? addDaysTo(task.lastDone, task.intervalDays) : null;
+}
+function taskStatus(task){
+  const due = nextDue(task);
+  if(!due) return UNSCHEDULED;
+  const n = daysBetween(parseDate(todayISO()), parseDate(due));
+  if(n < 0) return OVERDUE;
+  if(n <= DAYS_DUE) return DUE;
+  if(n <= DAYS_SOON) return SOON;
+  return LATER;
+}
+const allTasks = item => (item.tasks || []);
+
+/* ---------- 5. Demo data ---------- */
+function demoData(){
+  const now = todayISO();
+  const daysAgo = n => addDaysTo(now, -n);
+  return [
+    { id:uid(), name:"Refrigerator", icon:"🧊", category:"appliance", purchaseDate:"2024-09-01", warrantyMonths:36,
+      notes:"Keep 2 cm of clearance behind the unit for airflow.",
+      tasks:[{ id:uid(), name:"Clean door seals & condenser coils", intervalDays:180, lastDone:daysAgo(40), log:[] }] },
+    { id:uid(), name:"Air conditioner", icon:"❄️", category:"appliance", purchaseDate:"2025-06-15", warrantyMonths:24,
+      notes:"", tasks:[
+        { id:uid(), name:"Wash the air filter", intervalDays:90, lastDone:daysAgo(30), log:[] },
+        { id:uid(), name:"Professional deep clean", intervalDays:365, lastDone:daysAgo(340), log:[] } ] },
+    { id:uid(), name:"Robot vacuum", icon:"🤖", category:"electronics", purchaseDate:"2025-11-05", warrantyMonths:12,
+      notes:"", tasks:[
+        { id:uid(), name:"Empty dust bin & clean sensors", intervalDays:30, lastDone:daysAgo(12), log:[] } ] },
+    { id:uid(), name:"Smoke detector", icon:"🚨", category:"electronics", purchaseDate:"2022-05-01", warrantyMonths:60,
+      notes:"One on every floor — test monthly.", tasks:[
+        { id:uid(), name:"Replace backup battery", intervalDays:180, lastDone:daysAgo(172), log:[] } ] },
+    { id:uid(), name:"Family sedan", icon:"🚗", category:"vehicle", purchaseDate:"2023-11-18", warrantyMonths:48,
+      notes:"", tasks:[
+        { id:uid(), name:"Change engine oil", intervalDays:180, lastDone:daysAgo(20), log:[] },
+        { id:uid(), name:"Check tire pressure", intervalDays:30, lastDone:daysAgo(8), log:[] } ] },
+    { id:uid(), name:"Water heater", icon:"♨️", category:"appliance", purchaseDate:"2025-02-10", warrantyMonths:24,
+      notes:"", tasks:[
+        { id:uid(), name:"Flush the tank", intervalDays:365, lastDone:daysAgo(380), log:[] } ] },
+    { id:uid(), name:"Snake plant", icon:"🪴", category:"plant", purchaseDate:"2026-03-05", warrantyMonths:0,
+      notes:"Water only when the soil is fully dry.", tasks:[
+        { id:uid(), name:"Water & rotate", intervalDays:7, lastDone:daysAgo(2), log:[] } ] },
+    { id:uid(), name:"Sofa", icon:"🛋️", category:"furniture", purchaseDate:"2024-07-01", warrantyMonths:12,
+      notes:"", tasks:[
+        { id:uid(), name:"Vacuum upholstery & rotate cushions", intervalDays:90, lastDone:daysAgo(55), log:[] } ] }
+  ];
+}
+
+/* ---------- 6. Rendering ---------- */
+const $ = sel => document.querySelector(sel);
+const el = (tag, cls, html) => { const n = document.createElement(tag); if(cls) n.className = cls; if(html !== undefined) n.innerHTML = html; return n; };
+
+// Keep the static (non-JS-rendered) labels in sync with the chosen language.
+function applyStatic(){
+  const map = {
+    "tagline":"tagline", "tab-dashboard":"tabDashboard", "tab-items":"tabItems",
+    "tab-maintenance":"tabMaintenance", "tab-settings":"tabSettings",
+    "hd-attention":"hdAttention", "hd-timeline":"hdTimeline", "hd-cats":"hdCats",
+    "footer-privacy":"footerPrivacy",
+    "set-general":"setGeneral", "set-theme":"setTheme", "set-theme-desc":"setThemeDesc",
+    "set-lang":"setLang", "set-lang-desc":"setLangDesc",
+    "set-data":"setData", "set-export":"setExport", "set-export-desc":"setExportDesc",
+    "set-import":"setImport", "set-import-desc":"setImportDesc",
+    "set-demo":"setDemo", "set-demo-desc":"setDemoDesc",
+    "set-clear":"setClear", "set-clear-desc":"setClearDesc", "set-about":"setAbout"
+  };
+  for(const id in map){ const n = document.getElementById(id); if(n) n.textContent = t(map[id]); }
+  $("#searchInput").placeholder = t("searchPlaceholder");
+  $("#addBtn").title = t("addItem");
+  $("#themeBtn").title = t("setTheme");
+  $("#statusFilter").innerHTML =
+    `<option value="all">${t("allStatuses")}</option>
+     <option value="active">${t("stActive")}</option>
+     <option value="expiring">${t("stExpiring")}</option>
+     <option value="expired">${t("stExpired")}</option>
+     <option value="none">${t("stNone")}</option>`;
+  $("#statusFilter").value = statusFilter;
+}
+
+function render(){
+  applyStatic();
+  document.documentElement.setAttribute("data-theme", state.theme);
+  $("#themeIcon").innerHTML = state.theme === "dark"
+    ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
+    : '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>';
+  $("#darkToggle").checked = state.theme === "dark";
+  $("#langSelect").value = lang;
+  $("#langBtn").textContent = lang === "en" ? "中文" : "EN";
+  renderDashboard();
+  renderItems();
+  renderMaintenance();
+  renderSettings();
+  updateTabs();
+}
+
+function updateTabs(){
+  const need = itemsNeedingAttention();
+  $("#dot-items").classList.toggle("show", need.itemCount > 0);
+  $("#dot-maintenance").classList.toggle("show", need.taskCount > 0);
+}
+
+// Items that need attention: warranty expiring/expired, or any due/overdue task.
+function itemsNeedingAttention(){
+  let itemCount = 0, taskCount = 0;
+  state.items.forEach(it => {
+    const ws = warrantyStatus(it);
+    const hasIssue = ws === EXPIRING || ws === EXPIRED;
+    const dueTasks = allTasks(it).filter(x => [OVERDUE, DUE].includes(taskStatus(x))).length;
+    if(hasIssue || dueTasks > 0) itemCount++;
+    taskCount += dueTasks;
+  });
+  return { itemCount, taskCount };
+}
+
+/* --- Dashboard --- */
+function renderDashboard(){
+  const items = state.items;
+  const active = items.filter(i => warrantyStatus(i) === ACTIVE).length;
+  const expiring = items.filter(i => warrantyStatus(i) === EXPIRING).length;
+  const overdue = items.reduce((n, it) => n + allTasks(it).filter(x => taskStatus(x) === OVERDUE).length, 0);
+  const stats = [
+    { num: items.length, lbl: t("statItems"), cls:"ok", icon:"📦" },
+    { num: active, lbl: t("statWarranty"), cls:"ok", icon:"🛡️" },
+    { num: expiring, lbl: t("statExpiring"), cls: expiring ? "warn" : "ok", icon:"⏳" },
+    { num: overdue, lbl: t("statOverdue"), cls: overdue ? "danger" : "ok", icon:"⚠️" }
+  ];
+  $("#stats").innerHTML = stats.map(s =>
+    `<div class="stat"><div class="num ${s.cls}">${s.num}</div><div class="lbl">${s.icon} ${s.lbl}</div></div>`).join("");
+
+  // Attention list: expiring/expired warranties + due/overdue tasks.
+  const att = [];
+  items.forEach(it => {
+    const ws = warrantyStatus(it);
+    if(ws === EXPIRING || ws === EXPIRED) att.push({ kind:"warranty", ws, item:it, when:warrantyEnd(it) });
+    allTasks(it).forEach(tk => {
+      const st = taskStatus(tk);
+      if(st === OVERDUE || st === DUE) att.push({ kind:"task", st, item:it, task:tk, when:nextDue(tk) });
+    });
+  });
+  att.sort((a, b) => a.when.localeCompare(b.when));
+  const attBox = $("#attention-list");
+  if(!att.length){ attBox.innerHTML = `<div class="empty"><div class="big">🎉</div>${esc(t("emptyAttention"))}</div>`; }
+  else{
+    attBox.innerHTML = att.map(a => {
+      if(a.kind === "warranty"){
+        const st = a.ws === EXPIRED ? "danger" : "warn";
+        const lbl = a.ws === EXPIRED ? t("warrantyExpired") : t("warrantyExpiring");
+        return `<div class="task-row">
+          <div class="grow"><div class="nm">${esc(a.item.icon)} ${esc(a.item.name)}</div>
+          <div class="meta">${a.ws === EXPIRED ? t("attWarrantyExpired") : t("attWarranty")} · ${fmtDate(a.when)}</div></div>
+          <span class="badge ${st}">${lbl}</span></div>`;
+      }
+      const st = a.st === OVERDUE ? "danger" : "warn";
+      return `<div class="task-row">
+        <div class="grow"><div class="nm">${esc(a.task.name)}</div>
+        <div class="meta">${esc(a.item.icon)} ${esc(a.item.name)} · ${t("nextDue")} ${fmtDate(a.when)}</div></div>
+        <span class="badge ${st}">${a.st === OVERDUE ? t("taskOverdue") : t("taskDue")}</span></div>`;
+    }).join("");
+  }
+
+  // Timeline: all tasks with a due date within the next 30 days.
+  const horizon = addDaysTo(todayISO(), DAYS_SOON);
+  const upcoming = [];
+  items.forEach(it => allTasks(it).forEach(tk => {
+    const d = nextDue(tk);
+    if(d && d >= todayISO() && d <= horizon) upcoming.push({ item:it, task:tk, when:d, st:taskStatus(tk) });
+  }));
+  upcoming.sort((a, b) => a.when.localeCompare(b.when));
+  const tl = $("#timeline");
+  if(!upcoming.length){ tl.innerHTML = `<div class="empty"><div class="big">🌿</div>${esc(t("emptyTasks"))}</div>`; }
+  else{
+    tl.innerHTML = `<div class="tl">` + upcoming.map(u => {
+      const st = u.st === DUE ? "warn" : "";
+      return `<div class="tl-item ${st}"><div class="d">${fmtDate(u.when)} · ${fmtRel(u.when)}</div>
+        <div class="t">${esc(u.item.icon)} ${esc(u.item.name)} — ${esc(u.task.name)}</div></div>`;
+    }).join("") + `</div>`;
+  }
+
+  // Category distribution.
+  const counts = {};
+  items.forEach(i => counts[i.category] = (counts[i.category] || 0) + 1);
+  const max = Math.max(1, ...Object.values(counts));
+  $("#cat-dist").innerHTML = Object.entries(counts).map(([c, n]) => {
+    const info = catInfo(c);
+    return `<div class="cat-line"><span class="lab">${info.icon} ${esc(catLabel(c))}</span>
+      <div class="bar"><i style="display:block;height:100%;border-radius:999px;width:${Math.round(n/max*100)}%;background:${info.color}"></i></div>
+      <span class="val">${n}</span></div>`;
+  }).join("") || `<div class="empty">${esc(t("emptyItems"))}</div>`;
+}
+
+/* --- Items view --- */
+let searchQ = "", catFilter = "all", statusFilter = "all";
+function renderItems(){
+  const chips = [["all", t("all")], ...Object.keys(CATEGORIES).map(c => [c, catInfo(c).icon + " " + catLabel(c)])];
+  $("#catChips").innerHTML = chips.map(([c, label]) =>
+    `<button class="chip ${catFilter === c ? "active" : ""}" data-cat="${c}">${esc(label)}</button>`).join("");
+
+  const q = searchQ.toLowerCase();
+  let list = state.items.filter(it => {
+    if(catFilter !== "all" && it.category !== catFilter) return false;
+    if(statusFilter !== "all" && warrantyStatus(it) !== statusFilter) return false;
+    if(q && !(it.name + " " + (it.notes||"")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // Sort: expiring/expired first, then by name.
+  const order = { [EXPIRING]:0, [EXPIRED]:1, [ACTIVE]:2, [NOWARRANTY]:3 };
+  list.sort((a, b) => (order[warrantyStatus(a)] - order[warrantyStatus(b)]) || a.name.localeCompare(b.name));
+
+  const grid = $("#itemsGrid");
+  if(!list.length){ grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🏠</div>${esc(t("emptyItems"))}</div>`; return; }
+  grid.innerHTML = list.map(it => {
+    const ws = warrantyStatus(it);
+    const end = warrantyEnd(it);
+    const dueCount = allTasks(it).filter(x => [OVERDUE, DUE].includes(taskStatus(x))).length;
+    let bar = "", badge;
+    if(ws === NOWARRANTY){ badge = `<span class="badge muted">${t("noWarranty")}</span>`; }
+    else{
+      const n = daysBetween(parseDate(todayISO()), parseDate(end));
+      const pct = itemWarrantyPct(it);
+      const barCls = ws === EXPIRED ? "danger" : ws === EXPIRING ? "warn" : "";
+      bar = `<div class="warranty"><div class="meta"><span>${ws === EXPIRED ? t("expiredAgo") : t("expires")} ${fmtDate(end)}</span>
+        <span>${ws === EXPIRED ? fmtRel(end) : t("daysLeft").replace("{n}", n)}</span></div>
+        <div class="bar ${barCls}"><i style="width:${pct}%"></i></div></div>`;
+      badge = `<span class="badge ${ws === EXPIRED ? "danger" : ws === EXPIRING ? "warn" : "ok"}">${t(ws === EXPIRED ? "warrantyExpired" : ws === EXPIRING ? "warrantyExpiring" : "warrantyActive")}</span>`;
+    }
+    const info = catInfo(it.category);
+    return `<div class="item-card" data-id="${it.id}">
+      <div class="top"><div class="item-ico">${esc(it.icon) || info.icon}</div>
+        <div class="grow" style="min-width:0"><h4>${esc(it.name)}</h4>
+          <span class="cat-tag" style="background:${info.color}">${esc(catLabel(it.category))}</span></div></div>
+      ${bar}
+      <div class="item-foot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        <span>${allTasks(it).length ? `${allTasks(it).length} ${t("task")}${dueCount ? ` · ${dueCount} ${t("tasksDue")}` : ""}` : t("noTasksShort")}</span>
+        <span style="margin-left:auto">${badge}</span>
+      </div></div>`;
+  }).join("");
+}
+
+// Percentage of warranty used, clamped to 0..100.
+function itemWarrantyPct(it){
+  const end = warrantyEnd(it);
+  if(!end || !it.purchaseDate) return 0;
+  const total = Math.max(1, daysBetween(parseDate(it.purchaseDate), parseDate(end)));
+  const used = daysBetween(parseDate(it.purchaseDate), parseDate(todayISO()));
+  return Math.min(100, Math.max(0, Math.round(used / total * 100)));
+}
+
+/* --- Maintenance view --- */
+function renderMaintenance(){
+  const groups = [OVERDUE, DUE, SOON, LATER];
+  const rows = [];
+  state.items.forEach(it => allTasks(it).forEach(tk => rows.push({ item:it, task:tk, st:taskStatus(tk), when:nextDue(tk) })));
+  const box = $("#maintenance-groups");
+  if(!rows.length){ box.innerHTML = `<div class="panel"><div class="empty"><div class="big">🧰</div>${esc(t("noTasks"))}</div></div>`; return; }
+  const labelOf = { [OVERDUE]:t("taskOverdue"), [DUE]:t("taskDue"), [SOON]:t("taskSoon"), [LATER]:t("taskLater") };
+  const badgeCls = { [OVERDUE]:"danger", [DUE]:"warn", [SOON]:"info", [LATER]:"muted" };
+  const groupIcon = { [OVERDUE]:"⚠️", [DUE]:"⏰", [SOON]:"📅", [LATER]:"🌱" };
+  box.innerHTML = groups.map(g => {
+    const gRows = rows.filter(r => r.st === g);
+    if(!gRows.length) return "";
+    gRows.sort((a, b) => (a.when || "9999").localeCompare(b.when || "9999"));
+    return `<div class="panel">
+      <h3>${groupIcon[g]} <span>${labelOf[g]}</span> <span class="badge ${badgeCls[g]}">${gRows.length}</span></h3>
+      ${gRows.map(r => `
+        <div class="task-row">
+          <div class="grow">
+            <div class="nm">${esc(r.item.icon)} ${esc(r.task.name)}</div>
+            <div class="meta">${esc(r.item.name)} · ${t("lastDone")} ${r.task.lastDone ? fmtDate(r.task.lastDone) : t("never")} · ${t("nextDue")} <b>${fmtDate(r.when)}</b> (${fmtRel(r.when)})</div>
+          </div>
+          ${r.st !== UNSCHEDULED ? `<button class="mini-btn" data-done="${r.item.id}|${r.task.id}">${t("markDone")}</button>` : ""}
+        </div>`).join("")}
+    </div>`;
+  }).join("");
+}
+
+/* --- Settings --- */
+function renderSettings(){
+  $("#about-text").textContent = `UpkeepTrack v1.0 — ${t("tagline")}. Built with vanilla JavaScript, zero dependencies. MIT license.`;
+}
+
+/* ---------- 7. Modals ---------- */
+function openModal(html){
+  $("#modal-root").innerHTML = `<div class="modal-overlay open" id="modalOverlay">${html}</div>`;
+  $("#modalOverlay").addEventListener("mousedown", e => { if(e.target.id === "modalOverlay") closeModal(); });
+}
+function closeModal(){ $("#modal-root").innerHTML = ""; }
+
+function confirmDialog(title, msg, okLabel, okClass, onOk){
+  openModal(`<div class="modal" style="max-width:420px">
+    <div class="modal-head"><h2>${esc(title)}</h2></div>
+    <div class="modal-body"><p style="font-size:14px;color:var(--muted)">${esc(msg)}</p></div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>${t("cancelShort")}</button>
+      <button class="btn ${okClass}" id="confirmOk">${esc(okLabel)}</button>
+    </div></div>`);
+  $("#modalOverlay").querySelectorAll("[data-close]").forEach(b => b.onclick = closeModal);
+  $("#confirmOk").onclick = () => { closeModal(); onOk(); };
+}
+
+/* --- Item form modal (add / edit) --- */
+function openItemForm(item){
+  const isEdit = !!item;
+  item = item || { id:uid(), name:"", icon:"📦", category:"other", purchaseDate:"", warrantyMonths:"", notes:"", tasks:[] };
+  openModal(`<div class="modal">
+    <div class="modal-head"><h2 style="flex:1">${isEdit ? t("editItem") : t("addItem")}</h2><button class="mini-btn ghost" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>${t("itemName")} *</label>
+        <input type="text" id="f-name" value="${esc(item.name)}" maxlength="60" autofocus>
+      </div>
+      <div class="field">
+        <label>${t("category")}</label>
+        <select id="f-cat">${Object.keys(CATEGORIES).map(c =>
+          `<option value="${c}" ${item.category === c ? "selected" : ""}>${catInfo(c).icon} ${catLabel(c)}</option>`).join("")}</select>
+      </div>
+      <div class="field">
+        <label>Icon</label>
+        <div class="emoji-picker" id="f-emojis">
+          ${EMOJIS.map(e => `<button type="button" data-e="${e}" class="${item.icon === e ? "sel" : ""}">${e}</button>`).join("")}
+        </div>
+        <input type="text" id="f-icon" value="${esc(item.icon)}" maxlength="8" style="margin-top:8px;width:88px;text-align:center">
+      </div>
+      <div class="detail-grid" style="grid-template-columns:1fr 1fr;margin:0">
+        <div class="field"><label>${t("purchaseDate")}</label>
+          <input type="date" id="f-purchase" value="${esc(item.purchaseDate || "")}"></div>
+        <div class="field"><label>${t("warrantyMonths")}</label>
+          <input type="number" id="f-warranty" min="0" max="600" value="${item.warrantyMonths || ""}" placeholder="—">
+          <div class="hint">${t("warrantyHint")}</div></div>
+      </div>
+      <div class="field"><label>${t("notes")}</label>
+        <textarea id="f-notes" maxlength="500">${esc(item.notes || "")}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>${t("cancel")}</button>
+      <button class="btn" id="f-save">${t("save")}</button>
+    </div></div>`);
+
+  // Emoji picker behaviour.
+  const picker = $("#f-emojis");
+  picker.addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    picker.querySelectorAll("button").forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    $("#f-icon").value = b.dataset.e;
+  });
+
+  $("#modalOverlay").querySelectorAll("[data-close]").forEach(b => b.onclick = closeModal);
+  $("#f-save").onclick = () => {
+    const name = $("#f-name").value.trim();
+    if(!name){ toast(t("nameRequired")); $("#f-name").focus(); return; }
+    item.name = name;
+    item.category = $("#f-cat").value;
+    item.icon = $("#f-icon").value.trim() || catInfo(item.category).icon;
+    item.purchaseDate = $("#f-purchase").value || "";
+    const wm = parseInt($("#f-warranty").value, 10);
+    item.warrantyMonths = wm > 0 ? wm : 0;
+    item.notes = $("#f-notes").value.trim();
+    if(!isEdit) state.items.push(item);
+    save(); closeModal(); render();
+    toast(t("itemSaved"));
+  };
+}
+
+/* --- Item detail modal --- */
+function openDetail(id){
+  const it = state.items.find(x => x.id === id);
+  if(!it) return;
+  const ws = warrantyStatus(it);
+  const end = warrantyEnd(it);
+  const nLeft = end ? daysBetween(parseDate(todayISO()), parseDate(end)) : null;
+  const dueCount = allTasks(it).filter(x => [OVERDUE, DUE].includes(taskStatus(x))).length;
+
+  openModal(`<div class="modal">
+    <div class="modal-head"><h2 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.icon)} ${esc(it.name)}</h2>
+      <button class="mini-btn ghost" id="d-edit">${t("editItem")}</button>
+      <button class="mini-btn ghost" id="d-del">${t("delete")}</button>
+      <button class="mini-btn ghost" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="detail-grid">
+        <div class="detail-cell"><div class="k">${t("detailWarranty")}</div>
+          <div class="v">${end ? fmtDate(end) + " · " + fmtRel(end) : t("noWarranty")}</div></div>
+        <div class="detail-cell"><div class="k">${t("detailPurchased")}</div>
+          <div class="v">${fmtDate(it.purchaseDate)}</div></div>
+        <div class="detail-cell"><div class="k">${t("detailExpires")}</div>
+          <div class="v">${ws === NOWARRANTY ? "—" : t(ws === EXPIRED ? "warrantyExpired" : ws === EXPIRING ? "warrantyExpiring" : "warrantyActive")}</div></div>
+        <div class="detail-cell"><div class="k">${t("detailDaysLeft")}</div>
+          <div class="v">${nLeft === null ? "—" : nLeft < 0 ? t("expiredAgo") : nLeft}</div></div>
+      </div>
+      ${it.notes ? `<div class="notes-box"><div class="k">${t("notes")}</div><div class="v">${esc(it.notes)}</div></div>` : ""}
+
+      <div class="modal-head" style="padding:0 0 10px;border:none;position:static"><h2 style="font-size:15px">🧰 ${t("tasks")} ${dueCount ? `<span class="badge danger" style="margin-left:6px">${dueCount} ${t("tasksDue")}</span>` : ""}</h2></div>
+      <div id="d-tasks"></div>
+
+      <div class="field" style="margin-top:16px">
+        <label>${t("addTask")}</label>
+        <input type="text" id="t-name" placeholder="${esc(t("taskName"))}…" maxlength="60">
+        <div class="detail-grid" style="grid-template-columns:1fr 1fr;margin:10px 0 0">
+          <div class="field"><label>${t("intervalDays")}</label>
+            <input type="number" id="t-int" min="1" max="3650" placeholder="90"></div>
+          <div class="field"><label>${t("lastDoneDate")}</label>
+            <input type="date" id="t-last"></div>
+        </div>
+        <div class="hint">${t("taskHint")}</div>
+      </div>
+      <button class="btn sm" id="t-add">+ ${t("addTaskBtn")}</button>
+    </div></div>`);
+
+  const renderTasks = () => {
+    const box = $("#d-tasks");
+    if(!allTasks(it).length){ box.innerHTML = `<div class="empty" style="padding:18px">${esc(t("noTasks"))}</div>`; return; }
+    box.innerHTML = allTasks(it).map(tk => {
+      const st = taskStatus(tk);
+      const due = nextDue(tk);
+      const cls = { [OVERDUE]:"danger", [DUE]:"warn", [SOON]:"info", [LATER]:"muted", [UNSCHEDULED]:"muted" }[st];
+      const lbl = t(st === OVERDUE ? "taskOverdue" : st === DUE ? "taskDue" : st === SOON ? "taskSoon" : st === LATER ? "taskLater" : "taskUnscheduled");
+      return `<div class="task-row">
+        <div class="grow"><div class="nm">${esc(tk.name)}</div>
+          <div class="meta">${t("lastDone")} ${tk.lastDone ? fmtDate(tk.lastDone) : t("never")} · ${t("nextDue")} ${fmtDate(due)}</div></div>
+        <span class="badge ${cls}">${lbl}</span>
+        ${st !== UNSCHEDULED ? `<button class="mini-btn" data-done="${tk.id}">${t("markDone")}</button>` : ""}
+        <button class="mini-btn ghost" data-del="${tk.id}" title="${t("deleteTask")}">✕</button>
+      </div>`;
+    }).join("");
+    box.querySelectorAll("[data-done]").forEach(b => b.onclick = () => {
+      const tk = allTasks(it).find(x => x.id === b.dataset.done);
+      tk.lastDone = todayISO(); tk.log = tk.log || [];
+      if(tk.log[tk.log.length-1] !== todayISO()) tk.log.push(todayISO());
+      if(tk.log.length > 30) tk.log = tk.log.slice(-30);
+      save(); renderTasks(); render(); toast(t("taskDone"));
+    });
+    box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+      it.tasks = allTasks(it).filter(x => x.id !== b.dataset.del);
+      save(); renderTasks(); render(); toast(t("taskDeleted"));
+    });
+  };
+  renderTasks();
+  $("#modalOverlay").querySelectorAll("[data-close]").forEach(b => b.onclick = closeModal);
+
+  $("#t-add").onclick = () => {
+    const name = $("#t-name").value.trim();
+    const days = parseInt($("#t-int").value, 10);
+    if(!name || !(days > 0)){ toast(t("taskNameReq")); return; }
+    it.tasks.push({ id:uid(), name, intervalDays:days, lastDone: $("#t-last").value || "", log:[] });
+    $("#t-name").value = ""; $("#t-int").value = ""; $("#t-last").value = "";
+    save(); renderTasks(); render(); toast(t("taskAdded"));
+  };
+  $("#d-edit").onclick = () => openItemForm(it);
+  $("#d-del").onclick = () => confirmDialog(t("confirmTitle"), t("confirmDeleteItem"), t("yesDelete"), "danger", () => {
+    state.items = state.items.filter(x => x.id !== it.id);
+    save(); closeModal(); render(); toast(t("itemDeleted"));
+  });
+}
+
+/* ---------- 8. Toasts ---------- */
+function toast(msg){
+  const n = el("div", "toast", esc(msg));
+  $("#toast-root").appendChild(n);
+  setTimeout(() => { n.style.opacity = "0"; n.style.transition = "opacity .3s"; setTimeout(() => n.remove(), 300); }, 2200);
+}
+
+/* ---------- 9. Global events ---------- */
+function switchView(name){
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
+}
+$("#tabs").addEventListener("click", e => {
+  const b = e.target.closest(".tab"); if(!b) return;
+  switchView(b.dataset.view);
+});
+$("#itemsGrid").addEventListener("click", e => {
+  const card = e.target.closest(".item-card"); if(card) openDetail(card.dataset.id);
+});
+// Maintenance view: mark a task as done (delegated, buttons carry "itemId|taskId").
+$("#maintenance-groups").addEventListener("click", e => {
+  const b = e.target.closest("[data-done]"); if(!b) return;
+  const [itemId, taskId] = b.dataset.done.split("|");
+  const it = state.items.find(x => x.id === itemId);
+  const tk = it && allTasks(it).find(x => x.id === taskId);
+  if(!tk) return;
+  tk.lastDone = todayISO(); tk.log = tk.log || [];
+  if(tk.log[tk.log.length-1] !== todayISO()) tk.log.push(todayISO());
+  if(tk.log.length > 30) tk.log = tk.log.slice(-30);
+  save(); render(); toast(t("taskDone"));
+});
+$("#catChips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if(!b) return;
+  catFilter = b.dataset.cat;
+  document.querySelectorAll(".chip").forEach(x => x.classList.toggle("active", x === b));
+  renderItems();
+});
+$("#searchInput").addEventListener("input", e => { searchQ = e.target.value; renderItems(); });
+$("#statusFilter").addEventListener("change", e => { statusFilter = e.target.value; renderItems(); });
+
+$("#addBtn").addEventListener("click", () => openItemForm(null));
+$("#themeBtn").addEventListener("click", () => {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  save(); render();
+});
+$("#darkToggle").addEventListener("change", e => {
+  state.theme = e.target.checked ? "dark" : "light";
+  save(); render();
+});
+$("#langBtn").addEventListener("click", () => setLang(lang === "en" ? "zh" : "en"));
+$("#langSelect").addEventListener("change", e => setLang(e.target.value));
+function setLang(l){
+  lang = l; state.lang = l;
+  document.documentElement.lang = l;
+  document.title = l === "zh" ? "UpkeepTrack — 家庭物品保养与保修跟踪" : "UpkeepTrack — Home Maintenance & Warranty Tracker";
+  save(); render();
+}
+
+// Settings actions.
+$("#exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ app:"UpkeepTrack", version:1, exportedAt:new Date().toISOString(), items:state.items }, null, 2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `upkeeptrack-backup-${todayISO()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(t("dataExported"));
+});
+$("#importBtn").addEventListener("click", () => $("#importFile").click());
+$("#importFile").addEventListener("change", e => {
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!Array.isArray(data.items)) throw new Error("bad");
+      confirmDialog(t("confirmTitle"), t("confirmImport"), t("yesImport"), "", () => {
+        state.items = data.items.map(it => ({ id: it.id || uid(), ...it, tasks: Array.isArray(it.tasks) ? it.tasks : [] }));
+        save(); render(); toast(t("dataImported"));
+      });
+    }catch(err){ toast(t("invalidFile")); }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+$("#demoBtn").addEventListener("click", () => {
+  state.items = demoData();
+  save(); render(); toast(t("demoLoaded"));
+});
+$("#clearBtn").addEventListener("click", () => confirmDialog(t("confirmTitle"), t("confirmClear"), t("yesErase"), "danger", () => {
+  state.items = [];
+  save(); render(); toast(t("allCleared"));
+}));
+
+// Escape key closes modals.
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
+
+/* ---------- 10. Init ---------- */
+load();
+lang = state.lang;
+document.documentElement.lang = lang;
+document.title = lang === "zh" ? "UpkeepTrack — 家庭物品保养与保修跟踪" : "UpkeepTrack — Home Maintenance & Warranty Tracker";
+render();
+</script>
+</body>
+</html>
